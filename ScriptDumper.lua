@@ -8,7 +8,6 @@ local TOOL_NAME = "NOVA DUMPER"
 
 -- ══════════════════ SERVICES ══════════════════
 local Players             = game:GetService("Players")
-local RunService          = game:GetService("RunService")
 local HttpService         = game:GetService("HttpService")
 local TweenService        = game:GetService("TweenService")
 local UserInputService    = game:GetService("UserInputService")
@@ -19,45 +18,32 @@ local PlayerGui   = LocalPlayer:WaitForChild("PlayerGui")
 
 -- ══════════════════ CONFIG ══════════════════
 local Config = {
-    -- SCRIPTS
-    LocalScript          = true,
-    ModuleScript         = true,
-    ScriptClientRun      = true,
-
-    -- REMOTES
-    RemoteEvent          = true,
-    RemoteFunction       = true,
-    Bindables            = false,
-
-    -- SERVICES
-    ReplicatedFirst      = true,
-    StarterGui           = true,
-    StarterPack          = true,
-    StarterPlayer        = true,
-    Lighting             = true,
-
-    -- REPORTS
-    ScriptIndex          = true,
-    HierarchyTree        = true,
-    GameInfo             = true,
-
-    -- PERFORMANCE
-    ChunkYield           = true,
-
-    -- ADVANCED
-    OutputFormat         = "Lua",    -- "Lua" | "JSON"
-    DecompileTimeout     = false,
-    TimeoutDuration      = 60,
-    MaxFileSize          = 0,        -- 0 = OFF
-    IncludeDisabledScripts = false,
-    DumpProperties       = false,
-    DetectObfuscation    = true,
-    AutoCopySummary      = false,
-
-    -- REPORTS ADVANCED
-    JSONExport           = true,
-    DependencyGraph      = true,
-    SizeBreakdown        = true,
+    LocalScript              = true,
+    ModuleScript             = true,
+    ScriptClientRun          = true,
+    RemoteEvent              = true,
+    RemoteFunction           = true,
+    Bindables                = false,
+    ReplicatedFirst          = true,
+    StarterGui               = true,
+    StarterPack              = true,
+    StarterPlayer            = true,
+    Lighting                 = true,
+    ScriptIndex              = true,
+    HierarchyTree            = true,
+    GameInfo                 = true,
+    ChunkYield               = true,
+    OutputFormat             = "Lua",
+    DecompileTimeout         = false,
+    TimeoutDuration          = 60,
+    MaxFileSize              = 0,
+    IncludeDisabledScripts   = false,
+    DumpProperties           = false,
+    DetectObfuscation        = true,
+    AutoCopySummary          = false,
+    JSONExport               = true,
+    DependencyGraph          = true,
+    SizeBreakdown            = true,
 }
 
 -- ══════════════════ THEME ══════════════════
@@ -66,9 +52,8 @@ local Theme = {
     BG2          = Color3.fromRGB(20, 20, 32),
     BG3          = Color3.fromRGB(28, 28, 42),
     Panel        = Color3.fromRGB(22, 22, 36),
-    Accent       = Color3.fromRGB(99, 102, 241),    -- indigo-500
+    Accent       = Color3.fromRGB(99, 102, 241),
     AccentHover  = Color3.fromRGB(129, 132, 255),
-    AccentDark   = Color3.fromRGB(67, 56, 202),
     Success      = Color3.fromRGB(34, 197, 94),
     Warning      = Color3.fromRGB(251, 191, 36),
     Danger       = Color3.fromRGB(239, 68, 68),
@@ -78,815 +63,643 @@ local Theme = {
     Border       = Color3.fromRGB(40, 40, 65),
     ToggleOff    = Color3.fromRGB(45, 45, 68),
     ToggleOn     = Color3.fromRGB(99, 102, 241),
-    HeaderGrad1  = Color3.fromRGB(99, 102, 241),
-    HeaderGrad2  = Color3.fromRGB(139, 92, 246),
 }
 
 -- ══════════════════ UTILITIES ══════════════════
-local function Create(className, props, children)
-    local inst = Instance.new(className)
+local function Create(cls, props)
+    local o = Instance.new(cls)
     for k, v in pairs(props or {}) do
-        if k ~= "Parent" then
-            inst[k] = v
-        end
+        if k ~= "Parent" then o[k] = v end
     end
-    for _, child in ipairs(children or {}) do
-        child.Parent = inst
-    end
-    if props and props.Parent then
-        inst.Parent = props.Parent
-    end
-    return inst
+    if props and props.Parent then o.Parent = props.Parent end
+    return o
 end
 
-local function Lerp(a, b, t)
-    return a + (b - a) * t
+local function RoundCorner(p, r)
+    Create("UICorner", {CornerRadius = UDim.new(0, r), Parent = p})
 end
 
-local function TweenColor(obj, prop, targetColor, duration)
-    TweenService:Create(obj, TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {[prop] = targetColor}):Play()
+local function Stroke(p, c, t)
+    Create("UIStroke", {Color = c or Theme.Border, Thickness = t or 1, Parent = p})
 end
 
-local function TweenSize(obj, targetSize, duration)
-    TweenService:Create(obj, TweenInfo.new(duration, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = targetSize}):Play()
+local function Tween(obj, props, dur, style, dir)
+    TweenService:Create(obj,
+        TweenInfo.new(dur or 0.18, style or Enum.EasingStyle.Quad, dir or Enum.EasingDirection.Out),
+        props):Play()
 end
 
-local function RoundCorner(parent, radius)
-    return Create("UICorner", {CornerRadius = UDim.new(0, radius), Parent = parent})
-end
-
-local function AddStroke(parent, color, thickness)
-    return Create("UIStroke", {Color = color or Theme.Border, Thickness = thickness or 1, Parent = parent})
-end
-
-local function AddPadding(parent, top, bottom, left, right)
-    return Create("UIPadding", {
-        PaddingTop    = UDim.new(0, top    or 8),
-        PaddingBottom = UDim.new(0, bottom or 8),
-        PaddingLeft   = UDim.new(0, left   or 12),
-        PaddingRight  = UDim.new(0, right  or 12),
-        Parent = parent
-    })
-end
-
--- ══════════════════ MAIN GUI ══════════════════
--- Remove old GUI if exists
+-- ══════════════════ DESTROY OLD GUI ══════════════════
 pcall(function()
-    if CoreGui:FindFirstChild("NovaDumperGui") then
-        CoreGui:FindFirstChild("NovaDumperGui"):Destroy()
-    end
+    local old = CoreGui:FindFirstChild("NovaDumperGui")
+    if old then old:Destroy() end
 end)
 
+-- ══════════════════ SCREEN GUI ══════════════════
 local ScreenGui = Create("ScreenGui", {
-    Name            = "NovaDumperGui",
-    ResetOnSpawn    = false,
-    ZIndexBehavior  = Enum.ZIndexBehavior.Sibling,
-    Parent          = (pcall(function() return CoreGui end) and CoreGui) or PlayerGui
+    Name           = "NovaDumperGui",
+    ResetOnSpawn   = false,
+    ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+    Parent         = (pcall(function() return CoreGui end) and CoreGui) or PlayerGui,
 })
 
--- ──────────── MAIN FRAME ────────────
+-- ══════════════════ MAIN FRAME ══════════════════
 local MainFrame = Create("Frame", {
-    Name            = "MainFrame",
-    Size            = UDim2.new(0, 340, 0, 560),
-    Position        = UDim2.new(0.5, -170, 0.5, -280),
+    Name             = "MainFrame",
+    Size             = UDim2.new(0, 340, 0, 560),
+    Position         = UDim2.new(0.5, -170, 0.5, -280),
     BackgroundColor3 = Theme.BG,
-    BorderSizePixel = 0,
-    Parent          = ScreenGui,
+    BorderSizePixel  = 0,
     ClipsDescendants = true,
+    Parent           = ScreenGui,
 })
 RoundCorner(MainFrame, 14)
-AddStroke(MainFrame, Theme.Border, 1)
+Stroke(MainFrame, Theme.Border, 1)
 
--- Drop Shadow
-local Shadow = Create("ImageLabel", {
-    Name            = "Shadow",
-    AnchorPoint     = Vector2.new(0.5, 0.5),
-    Position        = UDim2.new(0.5, 0, 0.5, 8),
-    Size            = UDim2.new(1, 30, 1, 30),
-    BackgroundTransparency = 1,
-    Image           = "rbxassetid://6015897843",
-    ImageColor3     = Color3.fromRGB(0,0,0),
-    ImageTransparency = 0.5,
-    ScaleType       = Enum.ScaleType.Slice,
-    SliceCenter     = Rect.new(49, 49, 450, 450),
-    ZIndex          = -1,
-    Parent          = MainFrame,
-})
-
--- ──────────── HEADER ────────────
+-- ── HEADER ──
 local Header = Create("Frame", {
-    Name            = "Header",
-    Size            = UDim2.new(1, 0, 0, 64),
+    Size             = UDim2.new(1, 0, 0, 64),
     BackgroundColor3 = Theme.BG2,
-    BorderSizePixel = 0,
-    Parent          = MainFrame,
+    BorderSizePixel  = 0,
+    Parent           = MainFrame,
 })
 RoundCorner(Header, 14)
 
--- Header gradient accent bar
-local HeaderAccent = Create("Frame", {
-    Name            = "Accent",
-    Size            = UDim2.new(1, 0, 0, 3),
-    Position        = UDim2.new(0, 0, 1, -3),
+-- Bottom accent line on header
+local HeaderLine = Create("Frame", {
+    Size             = UDim2.new(1, 0, 0, 2),
+    Position         = UDim2.new(0, 0, 1, -2),
     BackgroundColor3 = Theme.Accent,
-    BorderSizePixel = 0,
-    Parent          = Header,
+    BorderSizePixel  = 0,
+    Parent           = Header,
 })
 Create("UIGradient", {
     Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Theme.HeaderGrad1),
-        ColorSequenceKeypoint.new(1, Theme.HeaderGrad2),
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(99, 102, 241)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(139, 92, 246)),
     }),
-    Parent = HeaderAccent,
+    Parent = HeaderLine,
 })
 
--- Logo / Title
-local LogoFrame = Create("Frame", {
-    Name            = "LogoFrame",
-    Size            = UDim2.new(0, 120, 0, 38),
-    Position        = UDim2.new(0, 14, 0.5, -19),
+-- Title
+Create("TextLabel", {
+    Size             = UDim2.new(0, 160, 0, 22),
+    Position         = UDim2.new(0, 14, 0, 10),
     BackgroundTransparency = 1,
-    Parent          = Header,
+    Font             = Enum.Font.GothamBold,
+    Text             = TOOL_NAME,
+    TextColor3       = Theme.Text,
+    TextSize         = 18,
+    TextXAlignment   = Enum.TextXAlignment.Left,
+    Parent           = Header,
+})
+Create("TextLabel", {
+    Size             = UDim2.new(0, 200, 0, 14),
+    Position         = UDim2.new(0, 14, 0, 33),
+    BackgroundTransparency = 1,
+    Font             = Enum.Font.Gotham,
+    Text             = VERSION .. "  •  Enhanced Edition",
+    TextColor3       = Theme.Accent,
+    TextSize         = 10,
+    TextXAlignment   = Enum.TextXAlignment.Left,
+    Parent           = Header,
 })
 
-local TitleLabel = Create("TextLabel", {
-    Name            = "Title",
-    Size            = UDim2.new(1, 0, 0, 22),
-    Position        = UDim2.new(0, 0, 0, 0),
+-- Game ID (top right)
+Create("TextLabel", {
+    Size             = UDim2.new(0, 140, 0, 16),
+    Position         = UDim2.new(1, -180, 0, 10),
     BackgroundTransparency = 1,
-    Font            = Enum.Font.GothamBold,
-    Text            = TOOL_NAME,
-    TextColor3      = Theme.Text,
-    TextSize        = 18,
-    TextXAlignment  = Enum.TextXAlignment.Left,
-    Parent          = LogoFrame,
-})
-
-local VersionLabel = Create("TextLabel", {
-    Name            = "Version",
-    Size            = UDim2.new(1, 0, 0, 14),
-    Position        = UDim2.new(0, 0, 0, 22),
-    BackgroundTransparency = 1,
-    Font            = Enum.Font.Gotham,
-    Text            = VERSION .. "  •  Enhanced Edition",
-    TextColor3      = Theme.Accent,
-    TextSize        = 10,
-    TextXAlignment  = Enum.TextXAlignment.Left,
-    Parent          = LogoFrame,
-})
-
--- Game Name + ID
-local GameInfoFrame = Create("Frame", {
-    Size            = UDim2.new(0, 175, 0, 38),
-    Position        = UDim2.new(1, -195, 0.5, -19),
-    BackgroundTransparency = 1,
-    Parent          = Header,
-})
-
-local GameNameLabel = Create("TextLabel", {
-    Size            = UDim2.new(1, 0, 0, 20),
-    Position        = UDim2.new(0, 0, 0, 0),
-    BackgroundTransparency = 1,
-    Font            = Enum.Font.GothamSemibold,
-    Text            = game.Name ~= "" and game.Name or "Unknown Game",
-    TextColor3      = Theme.Text,
-    TextSize        = 12,
-    TextXAlignment  = Enum.TextXAlignment.Right,
-    TextTruncate    = Enum.TextTruncate.AtEnd,
-    Parent          = GameInfoFrame,
-})
-
-local GameIdLabel = Create("TextLabel", {
-    Size            = UDim2.new(1, 0, 0, 16),
-    Position        = UDim2.new(0, 0, 0, 20),
-    BackgroundTransparency = 1,
-    Font            = Enum.Font.Gotham,
-    Text            = "#" .. tostring(game.PlaceId),
-    TextColor3      = Theme.TextMuted,
-    TextSize        = 10,
-    TextXAlignment  = Enum.TextXAlignment.Right,
-    Parent          = GameInfoFrame,
+    Font             = Enum.Font.Gotham,
+    Text             = "#" .. tostring(game.PlaceId),
+    TextColor3       = Theme.TextMuted,
+    TextSize         = 10,
+    TextXAlignment   = Enum.TextXAlignment.Right,
+    Parent           = Header,
 })
 
 -- Close Button
 local CloseBtn = Create("TextButton", {
-    Name            = "CloseBtn",
-    Size            = UDim2.new(0, 28, 0, 28),
-    Position        = UDim2.new(1, -38, 0.5, -14),
+    Size             = UDim2.new(0, 28, 0, 28),
+    Position         = UDim2.new(1, -38, 0.5, -14),
     BackgroundColor3 = Color3.fromRGB(40, 40, 60),
-    BorderSizePixel = 0,
-    Font            = Enum.Font.GothamBold,
-    Text            = "✕",
-    TextColor3      = Theme.TextSub,
-    TextSize        = 13,
-    Parent          = Header,
-    ZIndex          = 10,
+    BorderSizePixel  = 0,
+    Font             = Enum.Font.GothamBold,
+    Text             = "✕",
+    TextColor3       = Theme.TextSub,
+    TextSize         = 13,
+    ZIndex           = 10,
+    Parent           = Header,
 })
 RoundCorner(CloseBtn, 8)
+CloseBtn.MouseEnter:Connect(function() Tween(CloseBtn, {BackgroundColor3 = Theme.Danger, TextColor3 = Color3.new(1,1,1)}) end)
+CloseBtn.MouseLeave:Connect(function() Tween(CloseBtn, {BackgroundColor3 = Color3.fromRGB(40,40,60), TextColor3 = Theme.TextSub}) end)
+CloseBtn.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
 
-CloseBtn.MouseEnter:Connect(function()
-    TweenColor(CloseBtn, "BackgroundColor3", Theme.Danger, 0.15)
-    TweenColor(CloseBtn, "TextColor3", Color3.fromRGB(255,255,255), 0.15)
-end)
-CloseBtn.MouseLeave:Connect(function()
-    TweenColor(CloseBtn, "BackgroundColor3", Color3.fromRGB(40,40,60), 0.15)
-    TweenColor(CloseBtn, "TextColor3", Theme.TextSub, 0.15)
-end)
-CloseBtn.MouseButton1Click:Connect(function()
-    ScreenGui:Destroy()
-end)
-
--- ──────────── SCROLL AREA ────────────
-local ScrollContainer = Create("ScrollingFrame", {
-    Name                = "ScrollContainer",
-    Size                = UDim2.new(1, 0, 1, -118),
-    Position            = UDim2.new(0, 0, 0, 64),
+-- ── SCROLL FRAME ──
+local ScrollFrame = Create("ScrollingFrame", {
+    Name                 = "ScrollFrame",
+    Size                 = UDim2.new(1, 0, 1, -118),
+    Position             = UDim2.new(0, 0, 0, 64),
     BackgroundTransparency = 1,
-    BorderSizePixel     = 0,
-    ScrollBarThickness  = 3,
+    BorderSizePixel      = 0,
+    ScrollBarThickness   = 3,
     ScrollBarImageColor3 = Theme.Accent,
-    ScrollingDirection  = Enum.ScrollingDirection.Y,
-    CanvasSize          = UDim2.new(0, 0, 0, 0),
-    AutomaticCanvasSize = Enum.AutomaticSize.Y,
-    Parent              = MainFrame,
-})
-AddPadding(ScrollContainer, 10, 10, 14, 14)
-
-local ContentList = Create("UIListLayout", {
-    SortOrder           = Enum.SortOrder.LayoutOrder,
-    Padding             = UDim.new(0, 6),
-    Parent              = ScrollContainer,
+    ScrollingDirection   = Enum.ScrollingDirection.Y,
+    CanvasSize           = UDim2.new(0, 0, 0, 0),
+    Parent               = MainFrame,
 })
 
--- ──────────── BOTTOM BAR ────────────
+-- Inner content frame — THIS IS THE KEY FIX
+-- UIListLayout goes here, not in ScrollFrame directly
+local Content = Create("Frame", {
+    Name             = "Content",
+    Size             = UDim2.new(1, 0, 0, 0),
+    BackgroundTransparency = 1,
+    AutomaticSize    = Enum.AutomaticSize.Y,
+    Parent           = ScrollFrame,
+})
+
+local ListLayout = Create("UIListLayout", {
+    SortOrder        = Enum.SortOrder.LayoutOrder,
+    Padding          = UDim.new(0, 5),
+    Parent           = Content,
+})
+
+Create("UIPadding", {
+    PaddingTop    = UDim.new(0, 10),
+    PaddingBottom = UDim.new(0, 10),
+    PaddingLeft   = UDim.new(0, 12),
+    PaddingRight  = UDim.new(0, 12),
+    Parent        = Content,
+})
+
+-- Auto-update canvas size when content changes
+ListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, ListLayout.AbsoluteContentSize.Y + 24)
+end)
+
+-- ── BOTTOM BAR ──
 local BottomBar = Create("Frame", {
-    Name            = "BottomBar",
-    Size            = UDim2.new(1, 0, 0, 54),
-    Position        = UDim2.new(0, 0, 1, -54),
+    Size             = UDim2.new(1, 0, 0, 54),
+    Position         = UDim2.new(0, 0, 1, -54),
     BackgroundColor3 = Theme.BG2,
-    BorderSizePixel = 0,
-    Parent          = MainFrame,
+    BorderSizePixel  = 0,
+    Parent           = MainFrame,
 })
-
 Create("Frame", {
-    Size            = UDim2.new(1, 0, 0, 1),
+    Size             = UDim2.new(1, 0, 0, 1),
     BackgroundColor3 = Theme.Border,
-    BorderSizePixel = 0,
-    Parent          = BottomBar,
+    BorderSizePixel  = 0,
+    Parent           = BottomBar,
 })
 
 local StatusLabel = Create("TextLabel", {
-    Name            = "Status",
-    Size            = UDim2.new(0.5, 0, 1, 0),
-    Position        = UDim2.new(0, 14, 0, 0),
+    Size             = UDim2.new(0.5, 0, 1, 0),
+    Position         = UDim2.new(0, 14, 0, 0),
     BackgroundTransparency = 1,
-    Font            = Enum.Font.Gotham,
-    Text            = "● ready",
-    TextColor3      = Theme.Success,
-    TextSize        = 11,
-    TextXAlignment  = Enum.TextXAlignment.Left,
-    Parent          = BottomBar,
+    Font             = Enum.Font.Gotham,
+    Text             = "● ready",
+    TextColor3       = Theme.Success,
+    TextSize         = 11,
+    TextXAlignment   = Enum.TextXAlignment.Left,
+    Parent           = BottomBar,
 })
 
 local DumpBtn = Create("TextButton", {
-    Name            = "DumpBtn",
-    Size            = UDim2.new(0, 130, 0, 36),
-    Position        = UDim2.new(1, -144, 0.5, -18),
+    Size             = UDim2.new(0, 136, 0, 36),
+    Position         = UDim2.new(1, -148, 0.5, -18),
     BackgroundColor3 = Theme.Accent,
-    BorderSizePixel = 0,
-    Font            = Enum.Font.GothamBold,
-    Text            = "  ▶  START DUMP",
-    TextColor3      = Color3.fromRGB(255, 255, 255),
-    TextSize        = 12,
-    Parent          = BottomBar,
+    BorderSizePixel  = 0,
+    Font             = Enum.Font.GothamBold,
+    Text             = "  ▶  START DUMP",
+    TextColor3       = Color3.new(1,1,1),
+    TextSize         = 12,
+    Parent           = BottomBar,
 })
 RoundCorner(DumpBtn, 10)
 Create("UIGradient", {
     Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Theme.Accent),
-        ColorSequenceKeypoint.new(1, Theme.HeaderGrad2),
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(99, 102, 241)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(139, 92, 246)),
     }),
     Rotation = 90,
     Parent = DumpBtn,
 })
+DumpBtn.MouseEnter:Connect(function() Tween(DumpBtn, {BackgroundColor3 = Theme.AccentHover}) end)
+DumpBtn.MouseLeave:Connect(function() Tween(DumpBtn, {BackgroundColor3 = Theme.Accent}) end)
 
-DumpBtn.MouseEnter:Connect(function()
-    TweenColor(DumpBtn, "BackgroundColor3", Theme.AccentHover, 0.15)
-end)
-DumpBtn.MouseLeave:Connect(function()
-    TweenColor(DumpBtn, "BackgroundColor3", Theme.Accent, 0.15)
-end)
+-- ══════════════════ COMPONENT BUILDERS ══════════════════
 
--- ══════════════════ UI COMPONENTS ══════════════════
-
--- Section Header
-local function CreateSection(title, icon)
-    local row = Create("Frame", {
-        Size            = UDim2.new(1, 0, 0, 26),
-        BackgroundTransparency = 1,
-        LayoutOrder     = 0,
-        Parent          = ScrollContainer,
-    })
-
-    local accent = Create("Frame", {
-        Size            = UDim2.new(0, 3, 0.6, 0),
-        Position        = UDim2.new(0, 0, 0.2, 0),
-        BackgroundColor3 = Theme.Accent,
-        BorderSizePixel = 0,
-        Parent          = row,
-    })
-    RoundCorner(accent, 2)
-
-    Create("TextLabel", {
-        Size            = UDim2.new(1, -10, 1, 0),
-        Position        = UDim2.new(0, 10, 0, 0),
-        BackgroundTransparency = 1,
-        Font            = Enum.Font.GothamBold,
-        Text            = (icon and (icon .. "  ") or "") .. string.upper(title),
-        TextColor3      = Theme.TextMuted,
-        TextSize        = 10,
-        TextXAlignment  = Enum.TextXAlignment.Left,
-        LetterSpacing   = 2,
-        Parent          = row,
-    })
-
-    return row
+local layoutOrder = 0
+local function NextOrder()
+    layoutOrder = layoutOrder + 1
+    return layoutOrder
 end
 
--- Toggle Row
-local function CreateToggle(label, configKey, description)
-    local isOn = Config[configKey]
+-- Section label
+local function Section(title, icon)
+    local f = Create("Frame", {
+        Size             = UDim2.new(1, 0, 0, 28),
+        BackgroundTransparency = 1,
+        LayoutOrder      = NextOrder(),
+        Parent           = Content,
+    })
+    Create("Frame", {
+        Size             = UDim2.new(0, 3, 0.55, 0),
+        Position         = UDim2.new(0, 0, 0.22, 0),
+        BackgroundColor3 = Theme.Accent,
+        BorderSizePixel  = 0,
+        Parent           = f,
+    })
+    RoundCorner(f, 2)
+    Create("TextLabel", {
+        Size             = UDim2.new(1, -10, 1, 0),
+        Position         = UDim2.new(0, 10, 0, 0),
+        BackgroundTransparency = 1,
+        Font             = Enum.Font.GothamBold,
+        Text             = (icon or "") .. "  " .. string.upper(title),
+        TextColor3       = Theme.TextMuted,
+        TextSize         = 10,
+        TextXAlignment   = Enum.TextXAlignment.Left,
+        Parent           = f,
+    })
+    return f
+end
+
+-- Toggle row
+local function Toggle(label, desc, cfgKey)
+    local isOn = Config[cfgKey]
 
     local row = Create("Frame", {
-        Size            = UDim2.new(1, 0, 0, 42),
+        Size             = UDim2.new(1, 0, 0, desc and 46 or 40),
         BackgroundColor3 = Theme.Panel,
-        BorderSizePixel = 0,
-        Parent          = ScrollContainer,
+        BorderSizePixel  = 0,
+        LayoutOrder      = NextOrder(),
+        Parent           = Content,
     })
     RoundCorner(row, 8)
-    AddStroke(row, Theme.Border, 1)
+    Stroke(row, Theme.Border, 1)
 
-    local labelFrame = Create("Frame", {
-        Size            = UDim2.new(1, -68, 1, 0),
-        Position        = UDim2.new(0, 14, 0, 0),
-        BackgroundTransparency = 1,
-        Parent          = row,
-    })
-
+    -- Label block
     Create("TextLabel", {
-        Size            = UDim2.new(1, 0, description and 0.55 or 1, 0),
+        Size             = UDim2.new(1, -70, 0, 20),
+        Position         = UDim2.new(0, 14, 0, desc and 6 or 10),
         BackgroundTransparency = 1,
-        Font            = Enum.Font.GothamSemibold,
-        Text            = label,
-        TextColor3      = Theme.Text,
-        TextSize        = 13,
-        TextXAlignment  = Enum.TextXAlignment.Left,
-        Parent          = labelFrame,
+        Font             = Enum.Font.GothamSemibold,
+        Text             = label,
+        TextColor3       = Theme.Text,
+        TextSize         = 13,
+        TextXAlignment   = Enum.TextXAlignment.Left,
+        Parent           = row,
     })
-
-    if description then
+    if desc then
         Create("TextLabel", {
-            Size            = UDim2.new(1, 0, 0.45, 0),
-            Position        = UDim2.new(0, 0, 0.55, 0),
+            Size             = UDim2.new(1, -70, 0, 14),
+            Position         = UDim2.new(0, 14, 0, 26),
             BackgroundTransparency = 1,
-            Font            = Enum.Font.Gotham,
-            Text            = description,
-            TextColor3      = Theme.TextMuted,
-            TextSize        = 10,
-            TextXAlignment  = Enum.TextXAlignment.Left,
-            Parent          = labelFrame,
+            Font             = Enum.Font.Gotham,
+            Text             = desc,
+            TextColor3       = Theme.TextMuted,
+            TextSize         = 10,
+            TextXAlignment   = Enum.TextXAlignment.Left,
+            Parent           = row,
         })
     end
 
-    -- Toggle Track
+    -- Track
     local track = Create("Frame", {
-        Size            = UDim2.new(0, 44, 0, 24),
-        Position        = UDim2.new(1, -54, 0.5, -12),
+        Size             = UDim2.new(0, 44, 0, 24),
+        Position         = UDim2.new(1, -54, 0.5, -12),
         BackgroundColor3 = isOn and Theme.ToggleOn or Theme.ToggleOff,
-        BorderSizePixel = 0,
-        Parent          = row,
+        BorderSizePixel  = 0,
+        Parent           = row,
     })
     RoundCorner(track, 12)
 
-    -- Toggle Knob
+    -- Knob
     local knob = Create("Frame", {
-        Size            = UDim2.new(0, 18, 0, 18),
-        Position        = isOn and UDim2.new(0, 23, 0.5, -9) or UDim2.new(0, 3, 0.5, -9),
-        BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-        BorderSizePixel = 0,
-        Parent          = track,
+        Size             = UDim2.new(0, 18, 0, 18),
+        Position         = isOn and UDim2.new(0, 23, 0.5, -9) or UDim2.new(0, 3, 0.5, -9),
+        BackgroundColor3 = Color3.new(1,1,1),
+        BorderSizePixel  = 0,
+        Parent           = track,
     })
     RoundCorner(knob, 9)
 
-    -- Glow when ON
-    local glow = Create("ImageLabel", {
-        AnchorPoint     = Vector2.new(0.5, 0.5),
-        Position        = UDim2.new(0.5, 0, 0.5, 0),
-        Size            = UDim2.new(2, 0, 2, 0),
+    -- Click zone (full row)
+    local btn = Create("TextButton", {
+        Size             = UDim2.new(1, 0, 1, 0),
         BackgroundTransparency = 1,
-        Image           = "rbxassetid://6015897843",
-        ImageColor3     = Theme.Accent,
-        ImageTransparency = isOn and 0.7 or 1,
-        ScaleType       = Enum.ScaleType.Slice,
-        SliceCenter     = Rect.new(49, 49, 450, 450),
-        ZIndex          = -1,
-        Parent          = track,
+        Text             = "",
+        ZIndex           = 5,
+        Parent           = row,
     })
 
-    -- Click logic
-    local clickArea = Create("TextButton", {
-        Size            = UDim2.new(1, 0, 1, 0),
-        BackgroundTransparency = 1,
-        Text            = "",
-        Parent          = row,
-        ZIndex          = 5,
-    })
-
-    local function updateToggle(state)
-        Config[configKey] = state
-        isOn = state
-
-        local targetPos = state and UDim2.new(0, 23, 0.5, -9) or UDim2.new(0, 3, 0.5, -9)
-        local targetColor = state and Theme.ToggleOn or Theme.ToggleOff
-        local targetGlow = state and 0.7 or 1
-
-        TweenService:Create(knob, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            Position = targetPos
-        }):Play()
-        TweenColor(track, "BackgroundColor3", targetColor, 0.18)
-        TweenService:Create(glow, TweenInfo.new(0.18), {ImageTransparency = targetGlow}):Play()
+    local function setToggle(val)
+        Config[cfgKey] = val
+        isOn = val
+        Tween(knob, {Position = val and UDim2.new(0,23,0.5,-9) or UDim2.new(0,3,0.5,-9)})
+        Tween(track, {BackgroundColor3 = val and Theme.ToggleOn or Theme.ToggleOff})
     end
 
-    -- Hover highlight
-    clickArea.MouseEnter:Connect(function()
-        TweenColor(row, "BackgroundColor3", Color3.fromRGB(30, 30, 46), 0.1)
-    end)
-    clickArea.MouseLeave:Connect(function()
-        TweenColor(row, "BackgroundColor3", Theme.Panel, 0.1)
-    end)
-
-    clickArea.MouseButton1Click:Connect(function()
-        updateToggle(not isOn)
-    end)
-
-    return row, updateToggle
-end
-
--- Stepper Row (for numeric values)
-local function CreateStepper(label, configKey, unit, values)
-    local currentIdx = 1
-    if type(values) == "table" then
-        for i, v in ipairs(values) do
-            if v == Config[configKey] then currentIdx = i break end
-        end
-    end
-
-    local row = Create("Frame", {
-        Size            = UDim2.new(1, 0, 0, 42),
-        BackgroundColor3 = Theme.Panel,
-        BorderSizePixel = 0,
-        Parent          = ScrollContainer,
-    })
-    RoundCorner(row, 8)
-    AddStroke(row, Theme.Border, 1)
-
-    Create("TextLabel", {
-        Size            = UDim2.new(0.5, 0, 1, 0),
-        Position        = UDim2.new(0, 14, 0, 0),
-        BackgroundTransparency = 1,
-        Font            = Enum.Font.GothamSemibold,
-        Text            = label,
-        TextColor3      = Theme.Text,
-        TextSize        = 13,
-        TextXAlignment  = Enum.TextXAlignment.Left,
-        Parent          = row,
-    })
-
-    local controlFrame = Create("Frame", {
-        Size            = UDim2.new(0, 120, 0, 30),
-        Position        = UDim2.new(1, -130, 0.5, -15),
-        BackgroundColor3 = Theme.BG3,
-        BorderSizePixel = 0,
-        Parent          = row,
-    })
-    RoundCorner(controlFrame, 8)
-    AddStroke(controlFrame, Theme.Border, 1)
-
-    local minusBtn = Create("TextButton", {
-        Size            = UDim2.new(0, 30, 1, 0),
-        BackgroundTransparency = 1,
-        Font            = Enum.Font.GothamBold,
-        Text            = "−",
-        TextColor3      = Theme.TextSub,
-        TextSize        = 16,
-        Parent          = controlFrame,
-    })
-
-    local valueLabel = Create("TextLabel", {
-        Size            = UDim2.new(1, -60, 1, 0),
-        Position        = UDim2.new(0, 30, 0, 0),
-        BackgroundTransparency = 1,
-        Font            = Enum.Font.GothamBold,
-        Text            = tostring(values[currentIdx]) .. (unit or ""),
-        TextColor3      = Theme.Accent,
-        TextSize        = 13,
-        Parent          = controlFrame,
-    })
-
-    local plusBtn = Create("TextButton", {
-        Size            = UDim2.new(0, 30, 1, 0),
-        Position        = UDim2.new(1, -30, 0, 0),
-        BackgroundTransparency = 1,
-        Font            = Enum.Font.GothamBold,
-        Text            = "+",
-        TextColor3      = Theme.TextSub,
-        TextSize        = 16,
-        Parent          = controlFrame,
-    })
-
-    local function update()
-        local v = values[currentIdx]
-        Config[configKey] = v
-        valueLabel.Text = (v == 0 and "OFF" or tostring(v) .. (unit or ""))
-        valueLabel.TextColor3 = (v == 0) and Theme.TextMuted or Theme.Accent
-    end
-
-    minusBtn.MouseButton1Click:Connect(function()
-        currentIdx = math.max(1, currentIdx - 1)
-        update()
-    end)
-    plusBtn.MouseButton1Click:Connect(function()
-        currentIdx = math.min(#values, currentIdx + 1)
-        update()
-    end)
+    btn.MouseEnter:Connect(function() Tween(row, {BackgroundColor3 = Color3.fromRGB(30,30,48)}) end)
+    btn.MouseLeave:Connect(function() Tween(row, {BackgroundColor3 = Theme.Panel}) end)
+    btn.MouseButton1Click:Connect(function() setToggle(not isOn) end)
 
     return row
 end
 
--- Dropdown Row
-local function CreateDropdown(label, configKey, options)
-    local currentOpt = Config[configKey]
-    local open = false
+-- Stepper row (numeric)
+local function Stepper(label, cfgKey, unit, vals)
+    local idx = 1
+    for i, v in ipairs(vals) do
+        if v == Config[cfgKey] then idx = i break end
+    end
 
     local row = Create("Frame", {
-        Size            = UDim2.new(1, 0, 0, 42),
+        Size             = UDim2.new(1, 0, 0, 40),
         BackgroundColor3 = Theme.Panel,
-        BorderSizePixel = 0,
-        ClipsDescendants = false,
-        ZIndex          = 10,
-        Parent          = ScrollContainer,
+        BorderSizePixel  = 0,
+        LayoutOrder      = NextOrder(),
+        Parent           = Content,
     })
     RoundCorner(row, 8)
-    AddStroke(row, Theme.Border, 1)
+    Stroke(row, Theme.Border, 1)
 
     Create("TextLabel", {
-        Size            = UDim2.new(0.5, 0, 1, 0),
-        Position        = UDim2.new(0, 14, 0, 0),
+        Size             = UDim2.new(0.55, 0, 1, 0),
+        Position         = UDim2.new(0, 14, 0, 0),
         BackgroundTransparency = 1,
-        Font            = Enum.Font.GothamSemibold,
-        Text            = label,
-        TextColor3      = Theme.Text,
-        TextSize        = 13,
-        TextXAlignment  = Enum.TextXAlignment.Left,
-        ZIndex          = 10,
-        Parent          = row,
+        Font             = Enum.Font.GothamSemibold,
+        Text             = label,
+        TextColor3       = Theme.Text,
+        TextSize         = 13,
+        TextXAlignment   = Enum.TextXAlignment.Left,
+        Parent           = row,
     })
 
-    local dropBtn = Create("TextButton", {
-        Size            = UDim2.new(0, 90, 0, 28),
-        Position        = UDim2.new(1, -100, 0.5, -14),
+    local ctrl = Create("Frame", {
+        Size             = UDim2.new(0, 110, 0, 28),
+        Position         = UDim2.new(1, -120, 0.5, -14),
         BackgroundColor3 = Theme.BG3,
-        BorderSizePixel = 0,
-        Font            = Enum.Font.GothamSemibold,
-        Text            = currentOpt .. "  ▾",
-        TextColor3      = Theme.Accent,
-        TextSize        = 12,
-        ZIndex          = 10,
-        Parent          = row,
+        BorderSizePixel  = 0,
+        Parent           = row,
     })
-    RoundCorner(dropBtn, 7)
-    AddStroke(dropBtn, Theme.Border, 1)
+    RoundCorner(ctrl, 7)
+    Stroke(ctrl, Theme.Border, 1)
 
-    local dropList = Create("Frame", {
-        Size            = UDim2.new(0, 90, 0, #options * 34),
-        Position        = UDim2.new(1, -100, 1, 4),
+    local minus = Create("TextButton", {
+        Size             = UDim2.new(0, 28, 1, 0),
+        BackgroundTransparency = 1,
+        Font             = Enum.Font.GothamBold,
+        Text             = "−",
+        TextColor3       = Theme.TextSub,
+        TextSize         = 16,
+        Parent           = ctrl,
+    })
+
+    local valLabel = Create("TextLabel", {
+        Size             = UDim2.new(1, -56, 1, 0),
+        Position         = UDim2.new(0, 28, 0, 0),
+        BackgroundTransparency = 1,
+        Font             = Enum.Font.GothamBold,
+        Text             = "",
+        TextColor3       = Theme.Accent,
+        TextSize         = 12,
+        Parent           = ctrl,
+    })
+
+    local plus = Create("TextButton", {
+        Size             = UDim2.new(0, 28, 1, 0),
+        Position         = UDim2.new(1, -28, 0, 0),
+        BackgroundTransparency = 1,
+        Font             = Enum.Font.GothamBold,
+        Text             = "+",
+        TextColor3       = Theme.TextSub,
+        TextSize         = 16,
+        Parent           = ctrl,
+    })
+
+    local function refresh()
+        local v = vals[idx]
+        Config[cfgKey] = v
+        if v == 0 then
+            valLabel.Text = "OFF"
+            valLabel.TextColor3 = Theme.TextMuted
+        else
+            valLabel.Text = tostring(v) .. (unit or "")
+            valLabel.TextColor3 = Theme.Accent
+        end
+    end
+    refresh()
+
+    minus.MouseButton1Click:Connect(function() idx = math.max(1, idx-1); refresh() end)
+    plus.MouseButton1Click:Connect(function() idx = math.min(#vals, idx+1); refresh() end)
+    return row
+end
+
+-- Dropdown row
+local function Dropdown(label, cfgKey, opts)
+    local cur = Config[cfgKey]
+
+    local row = Create("Frame", {
+        Size             = UDim2.new(1, 0, 0, 40),
+        BackgroundColor3 = Theme.Panel,
+        BorderSizePixel  = 0,
+        ClipsDescendants = false,
+        LayoutOrder      = NextOrder(),
+        ZIndex           = 20,
+        Parent           = Content,
+    })
+    RoundCorner(row, 8)
+    Stroke(row, Theme.Border, 1)
+
+    Create("TextLabel", {
+        Size             = UDim2.new(0.5, 0, 1, 0),
+        Position         = UDim2.new(0, 14, 0, 0),
+        BackgroundTransparency = 1,
+        Font             = Enum.Font.GothamSemibold,
+        Text             = label,
+        TextColor3       = Theme.Text,
+        TextSize         = 13,
+        TextXAlignment   = Enum.TextXAlignment.Left,
+        ZIndex           = 20,
+        Parent           = row,
+    })
+
+    local btn = Create("TextButton", {
+        Size             = UDim2.new(0, 90, 0, 26),
+        Position         = UDim2.new(1, -100, 0.5, -13),
+        BackgroundColor3 = Theme.BG3,
+        BorderSizePixel  = 0,
+        Font             = Enum.Font.GothamSemibold,
+        Text             = cur .. " ▾",
+        TextColor3       = Theme.Accent,
+        TextSize         = 12,
+        ZIndex           = 20,
+        Parent           = row,
+    })
+    RoundCorner(btn, 7)
+    Stroke(btn, Theme.Border, 1)
+
+    local popup = Create("Frame", {
+        Size             = UDim2.new(0, 100, 0, #opts * 32),
+        Position         = UDim2.new(1, -100, 1, 4),
         BackgroundColor3 = Theme.BG2,
-        BorderSizePixel = 0,
-        Visible         = false,
-        ZIndex          = 20,
-        Parent          = row,
+        BorderSizePixel  = 0,
+        Visible          = false,
+        ZIndex           = 50,
+        Parent           = row,
     })
-    RoundCorner(dropList, 8)
-    AddStroke(dropList, Theme.Border, 1)
+    RoundCorner(popup, 8)
+    Stroke(popup, Theme.Border, 1)
+    Create("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder, Parent = popup})
 
-    Create("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder, Parent = dropList})
-
-    for i, opt in ipairs(options) do
-        local optBtn = Create("TextButton", {
-            Size            = UDim2.new(1, 0, 0, 34),
+    for i, opt in ipairs(opts) do
+        local ob = Create("TextButton", {
+            Size             = UDim2.new(1, 0, 0, 32),
             BackgroundTransparency = 1,
-            Font            = Enum.Font.GothamSemibold,
-            Text            = opt,
-            TextColor3      = opt == currentOpt and Theme.Accent or Theme.TextSub,
-            TextSize        = 12,
-            ZIndex          = 20,
-            LayoutOrder     = i,
-            Parent          = dropList,
+            Font             = Enum.Font.GothamSemibold,
+            Text             = opt,
+            TextColor3       = opt == cur and Theme.Accent or Theme.TextSub,
+            TextSize         = 12,
+            ZIndex           = 50,
+            LayoutOrder      = i,
+            Parent           = popup,
         })
-        optBtn.MouseEnter:Connect(function()
-            if opt ~= currentOpt then
-                TweenColor(optBtn, "TextColor3", Theme.Text, 0.1)
-            end
-        end)
-        optBtn.MouseLeave:Connect(function()
-            if opt ~= currentOpt then
-                TweenColor(optBtn, "TextColor3", Theme.TextSub, 0.1)
-            end
-        end)
-        optBtn.MouseButton1Click:Connect(function()
-            currentOpt = opt
-            Config[configKey] = opt
-            dropBtn.Text = opt .. "  ▾"
-            dropList.Visible = false
-            open = false
-            for _, child in ipairs(dropList:GetChildren()) do
-                if child:IsA("TextButton") then
-                    child.TextColor3 = (child.Text == opt) and Theme.Accent or Theme.TextSub
+        ob.MouseButton1Click:Connect(function()
+            cur = opt
+            Config[cfgKey] = opt
+            btn.Text = opt .. " ▾"
+            popup.Visible = false
+            for _, c in ipairs(popup:GetChildren()) do
+                if c:IsA("TextButton") then
+                    c.TextColor3 = (c.Text == opt) and Theme.Accent or Theme.TextSub
                 end
             end
         end)
     end
 
-    dropBtn.MouseButton1Click:Connect(function()
+    local open = false
+    btn.MouseButton1Click:Connect(function()
         open = not open
-        dropList.Visible = open
-        dropBtn.Text = currentOpt .. (open and "  ▴" or "  ▾")
+        popup.Visible = open
+        btn.Text = cur .. (open and " ▴" or " ▾")
     end)
 
     return row
 end
 
--- Info Banner
-local function CreateInfoBanner()
-    local banner = Create("Frame", {
-        Size            = UDim2.new(1, 0, 0, 46),
-        BackgroundColor3 = Color3.fromRGB(20, 25, 45),
-        BorderSizePixel = 0,
-        Parent          = ScrollContainer,
+-- Info banner
+local function InfoBanner()
+    local f = Create("Frame", {
+        Size             = UDim2.new(1, 0, 0, 50),
+        BackgroundColor3 = Color3.fromRGB(18, 22, 42),
+        BorderSizePixel  = 0,
+        LayoutOrder      = NextOrder(),
+        Parent           = Content,
     })
-    RoundCorner(banner, 8)
-    AddStroke(banner, Color3.fromRGB(50, 60, 100), 1)
+    RoundCorner(f, 8)
+    Stroke(f, Color3.fromRGB(50, 60, 110), 1)
 
     Create("TextLabel", {
-        Size            = UDim2.new(1, 0, 0.5, 0),
-        Position        = UDim2.new(0, 14, 0, 0),
+        Size             = UDim2.new(1, -14, 0, 22),
+        Position         = UDim2.new(0, 14, 0, 6),
         BackgroundTransparency = 1,
-        Font            = Enum.Font.GothamBold,
-        Text            = "⚡  " .. game.Name,
-        TextColor3      = Theme.Text,
-        TextSize        = 13,
-        TextXAlignment  = Enum.TextXAlignment.Left,
-        Parent          = banner,
+        Font             = Enum.Font.GothamBold,
+        Text             = "⚡  " .. (game.Name ~= "" and game.Name or "Unknown Game"),
+        TextColor3       = Theme.Text,
+        TextSize         = 13,
+        TextXAlignment   = Enum.TextXAlignment.Left,
+        TextTruncate     = Enum.TextTruncate.AtEnd,
+        Parent           = f,
     })
-
     Create("TextLabel", {
-        Size            = UDim2.new(1, -14, 0.5, 0),
-        Position        = UDim2.new(0, 14, 0.5, 0),
+        Size             = UDim2.new(1, -14, 0, 16),
+        Position         = UDim2.new(0, 14, 0, 28),
         BackgroundTransparency = 1,
-        Font            = Enum.Font.Gotham,
-        Text            = "PlaceId: " .. tostring(game.PlaceId) .. "   •   Players: " .. #Players:GetPlayers(),
-        TextColor3      = Theme.TextMuted,
-        TextSize        = 10,
-        TextXAlignment  = Enum.TextXAlignment.Left,
-        Parent          = banner,
+        Font             = Enum.Font.Gotham,
+        Text             = "PlaceId: " .. tostring(game.PlaceId) .. "   •   Players: " .. #Players:GetPlayers(),
+        TextColor3       = Theme.TextMuted,
+        TextSize         = 10,
+        TextXAlignment   = Enum.TextXAlignment.Left,
+        Parent           = f,
     })
-
-    return banner
+    return f
 end
 
--- ══════════════════ BUILD UI ══════════════════
+-- ══════════════════ BUILD CONTENT ══════════════════
 
-CreateInfoBanner()
+InfoBanner()
 
--- SCRIPTS
-CreateSection("Scripts", "📜")
-CreateToggle("LocalScript",         "LocalScript",     "Client-side Lua scripts")
-CreateToggle("ModuleScript",        "ModuleScript",    "Shared module scripts")
-CreateToggle("Script (Client Run)", "ScriptClientRun", "Server scripts run on client")
+Section("Scripts", "📜")
+Toggle("LocalScript",         "Client-side Lua scripts",     "LocalScript")
+Toggle("ModuleScript",        "Shared module scripts",        "ModuleScript")
+Toggle("Script (Client Run)", "Server scripts on client",     "ScriptClientRun")
 
--- REMOTES
-CreateSection("Remotes", "📡")
-CreateToggle("RemoteEvent",         "RemoteEvent",     "Network events (fire & forget)")
-CreateToggle("RemoteFunction",      "RemoteFunction",  "Network functions (invoke/return)")
-CreateToggle("Bindables",           "Bindables",       "Local bindable events & functions")
+Section("Remotes", "📡")
+Toggle("RemoteEvent",         "Network fire-and-forget",      "RemoteEvent")
+Toggle("RemoteFunction",      "Network invoke / return",      "RemoteFunction")
+Toggle("Bindables",           "Local bindable events",        "Bindables")
 
--- SERVICES
-CreateSection("Services", "⚙️")
-CreateToggle("ReplicatedFirst",     "ReplicatedFirst", "Loads before everything else")
-CreateToggle("StarterGui",          "StarterGui",      "UI scripts and frames")
-CreateToggle("StarterPack",         "StarterPack",     "Tools given to player on join")
-CreateToggle("StarterPlayer",       "StarterPlayer",   "PlayerScripts & CharacterScripts")
-CreateToggle("Lighting",            "Lighting",        "Atmosphere, sky & post-effects")
+Section("Services", "⚙️")
+Toggle("ReplicatedFirst",     "Loads before everything",      "ReplicatedFirst")
+Toggle("StarterGui",          "UI scripts & frames",          "StarterGui")
+Toggle("StarterPack",         "Tools given on join",          "StarterPack")
+Toggle("StarterPlayer",       "PlayerScripts & Char scripts", "StarterPlayer")
+Toggle("Lighting",            "Atmosphere & post effects",    "Lighting")
 
--- REPORTS
-CreateSection("Reports", "📊")
-CreateToggle("Script Index",        "ScriptIndex",     "List all scripts with paths")
-CreateToggle("Hierarchy Tree",      "HierarchyTree",   "Full instance hierarchy")
-CreateToggle("Game Info",           "GameInfo",        "Metadata, creator & asset info")
+Section("Reports", "📊")
+Toggle("Script Index",        "List all scripts with paths",  "ScriptIndex")
+Toggle("Hierarchy Tree",      "Full instance tree",           "HierarchyTree")
+Toggle("Game Info",           "Metadata, creator & JobId",    "GameInfo")
 
--- PERFORMANCE
-CreateSection("Performance", "⚡")
-CreateToggle("Chunk Yield (no freeze)", "ChunkYield",  "Yield between chunks to avoid lag")
+Section("Performance", "⚡")
+Toggle("Chunk Yield (no freeze)", "Yield between chunks",     "ChunkYield")
 
--- ADVANCED
-CreateSection("Advanced", "🔧")
-CreateDropdown("Output Format",      "OutputFormat",   {"Lua", "JSON", "Plain Text"})
-CreateToggle("Decompile Timeout",    "DecompileTimeout","Cancel stuck decompilations")
-CreateStepper("Timeout Duration",    "TimeoutDuration", "s",
-    {0, 10, 20, 30, 60, 90, 120, 180, 300})
-CreateStepper("Max File Size",       "MaxFileSize",     "MB",
-    {0, 1, 2, 5, 10, 25, 50, 100})
-CreateToggle("Include Disabled Scripts", "IncludeDisabledScripts", "Dump scripts that are disabled")
-CreateToggle("Dump Properties",      "DumpProperties",  "Include instance properties")
-CreateToggle("Detect Obfuscation",   "DetectObfuscation","Flag obfuscated scripts")
-CreateToggle("Auto-copy Summary",    "AutoCopySummary", "Copy summary to clipboard on done")
+Section("Advanced", "🔧")
+Dropdown("Output Format",     "OutputFormat", {"Lua", "JSON", "Plain Text"})
+Toggle("Decompile Timeout",   "Cancel stuck decompile",       "DecompileTimeout")
+Stepper("Timeout Duration",   "TimeoutDuration", "s", {0,10,20,30,60,90,120,180,300})
+Stepper("Max File Size",      "MaxFileSize",     "MB", {0,1,2,5,10,25,50,100})
+Toggle("Include Disabled",    "Dump disabled scripts",        "IncludeDisabledScripts")
+Toggle("Dump Properties",     "Include instance properties",  "DumpProperties")
+Toggle("Detect Obfuscation",  "Flag obfuscated scripts",      "DetectObfuscation")
+Toggle("Auto-copy Summary",   "Copy result to clipboard",     "AutoCopySummary")
 
--- REPORTS (ADVANCED)
-CreateSection("Reports (Advanced)", "📈")
-CreateToggle("JSON Export",          "JSONExport",      "Export full dump as JSON")
-CreateToggle("Dependency Graph",     "DependencyGraph", "Map module require() dependencies")
-CreateToggle("Size Breakdown",       "SizeBreakdown",   "Show size stats per script")
+Section("Reports (Advanced)", "📈")
+Toggle("JSON Export",         "Export dump as JSON",          "JSONExport")
+Toggle("Dependency Graph",    "Map require() dependencies",   "DependencyGraph")
+Toggle("Size Breakdown",      "Top scripts by size",          "SizeBreakdown")
 
--- ══════════════════ DUMPER LOGIC ══════════════════
-
+-- ══════════════════ DUMP LOGIC ══════════════════
 local isDumping = false
-local dumpResults = {}
-local totalDumped = 0
 
-local function SetStatus(text, color)
-    StatusLabel.Text = "● " .. text
-    StatusLabel.TextColor3 = color or Theme.Success
+local function SetStatus(txt, col)
+    StatusLabel.Text = "● " .. txt
+    StatusLabel.TextColor3 = col or Theme.Success
 end
 
-local function GetScriptsFromService(service, scriptTypes)
-    local found = {}
-    local ok, svc = pcall(function() return game:GetService(service) end)
-    if not ok or not svc then return found end
-
-    for _, desc in ipairs(svc:GetDescendants()) do
-        local className = desc.ClassName
-        if scriptTypes[className] then
-            table.insert(found, desc)
-        end
-    end
-    return found
+local function GetPath(obj)
+    local t = {}; local cur = obj
+    while cur and cur ~= game do table.insert(t,1,cur.Name); cur=cur.Parent end
+    return "game." .. table.concat(t,".")
 end
 
-local function GetRemotes()
-    local found = {}
-    for _, desc in ipairs(game:GetDescendants()) do
-        if Config.RemoteEvent and desc:IsA("RemoteEvent") then
-            table.insert(found, {obj = desc, type = "RemoteEvent"})
-        elseif Config.RemoteFunction and desc:IsA("RemoteFunction") then
-            table.insert(found, {obj = desc, type = "RemoteFunction"})
-        elseif Config.Bindables and (desc:IsA("BindableEvent") or desc:IsA("BindableFunction")) then
-            table.insert(found, {obj = desc, type = desc.ClassName})
-        end
-    end
-    return found
-end
-
-local function GetFullPath(obj)
-    local path = {}
-    local current = obj
-    while current and current ~= game do
-        table.insert(path, 1, current.Name)
-        current = current.Parent
-    end
-    return "game." .. table.concat(path, ".")
-end
-
-local function DecompileScript(script)
-    -- Try executor decompile APIs
+local function Decompile(s)
     if decompile then
-        local ok, src = pcall(decompile, script)
+        local ok, src = pcall(decompile, s)
         if ok and src and #src > 0 then return src end
     end
-    if getscriptbytecode then
-        return "-- [Bytecode only - no decompiler available]\n-- Path: " .. GetFullPath(script)
-    end
-    return "-- [Source not available]\n-- Path: " .. GetFullPath(script)
+    return "-- [Source unavailable]\n-- Path: " .. GetPath(s)
 end
 
-local function BuildHierarchyTree(root, indent)
-    indent = indent or 0
-    local lines = {}
-    local prefix = string.rep("  ", indent) .. (indent > 0 and "└─ " or "")
-    table.insert(lines, prefix .. root.Name .. " [" .. root.ClassName .. "]")
-    for _, child in ipairs(root:GetChildren()) do
-        for _, line in ipairs(BuildHierarchyTree(child, indent + 1)) do
-            table.insert(lines, line)
-        end
+local function BuildTree(root, depth)
+    depth = depth or 0
+    local lines = {string.rep("  ",depth) .. (depth>0 and "└─ " or "") .. root.Name .. " ["..root.ClassName.."]"}
+    for _, c in ipairs(root:GetChildren()) do
+        for _, l in ipairs(BuildTree(c, depth+1)) do table.insert(lines,l) end
     end
     return lines
 end
@@ -894,252 +707,170 @@ end
 local function RunDump()
     if isDumping then return end
     isDumping = true
-    dumpResults = {}
-    totalDumped = 0
 
     DumpBtn.Text = "  ⏳  DUMPING..."
-    DumpBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
-    SetStatus("Initializing dump...", Theme.Warning)
+    Tween(DumpBtn, {BackgroundColor3 = Color3.fromRGB(60,60,90)})
+    SetStatus("Starting dump...", Theme.Warning)
 
-    local scriptTypes = {}
-    if Config.LocalScript    then scriptTypes["LocalScript"]   = true end
-    if Config.ModuleScript   then scriptTypes["ModuleScript"]  = true end
-    if Config.ScriptClientRun then scriptTypes["Script"]       = true end
+    local svcNames = {}
+    if Config.ReplicatedFirst then table.insert(svcNames,"ReplicatedFirst") end
+    if Config.StarterGui      then table.insert(svcNames,"StarterGui") end
+    if Config.StarterPack     then table.insert(svcNames,"StarterPack") end
+    if Config.StarterPlayer   then table.insert(svcNames,"StarterPlayer") end
+    if Config.Lighting        then table.insert(svcNames,"Lighting") end
 
-    local services = {}
-    if Config.ReplicatedFirst  then table.insert(services, "ReplicatedFirst") end
-    if Config.StarterGui       then table.insert(services, "StarterGui") end
-    if Config.StarterPack      then table.insert(services, "StarterPack") end
-    if Config.StarterPlayer    then table.insert(services, "StarterPlayer") end
-    if Config.Lighting         then table.insert(services, "Lighting") end
+    local typeFilter = {}
+    if Config.LocalScript    then typeFilter.LocalScript  = true end
+    if Config.ModuleScript   then typeFilter.ModuleScript = true end
+    if Config.ScriptClientRun then typeFilter.Script      = true end
 
-    local allScripts = {}
+    local scripts, remotes = {}, {}
 
-    -- Collect scripts from services
-    for _, svcName in ipairs(services) do
-        SetStatus("Scanning " .. svcName .. "...", Theme.Warning)
-        if Config.ChunkYield then task.wait(0.05) end
-
-        local found = GetScriptsFromService(svcName, scriptTypes)
-        for _, s in ipairs(found) do
-            table.insert(allScripts, s)
-        end
-    end
-
-    SetStatus("Found " .. #allScripts .. " scripts. Dumping...", Theme.Warning)
-    task.wait(0.1)
-
-    -- Dump each script
-    for i, script in ipairs(allScripts) do
-        if not (Config.IncludeDisabledScripts == false and script:IsA("BaseScript") and not script.Enabled) then
-            local source = DecompileScript(script)
-            local path   = GetFullPath(script)
-            local size   = #source
-
-            -- Detect obfuscation
-            local obfuscated = false
-            if Config.DetectObfuscation then
-                obfuscated = source:find("\\%d%d%d") ~= nil
-                          or source:find("require%(%d+%d+%d+%d%d%d%d%d%d%d") ~= nil
-                          or (source:find("[^%w%s%p]") ~= nil)
+    for _, name in ipairs(svcNames) do
+        SetStatus("Scanning " .. name, Theme.Warning)
+        if Config.ChunkYield then task.wait(0.04) end
+        local ok, svc = pcall(game.GetService, game, name)
+        if ok and svc then
+            for _, d in ipairs(svc:GetDescendants()) do
+                if typeFilter[d.ClassName] then
+                    if Config.IncludeDisabledScripts or not (d:IsA("BaseScript") and not d.Enabled) then
+                        table.insert(scripts, d)
+                    end
+                end
+                if Config.RemoteEvent and d:IsA("RemoteEvent") then table.insert(remotes,{t="RemoteEvent",o=d}) end
+                if Config.RemoteFunction and d:IsA("RemoteFunction") then table.insert(remotes,{t="RemoteFunction",o=d}) end
+                if Config.Bindables and (d:IsA("BindableEvent") or d:IsA("BindableFunction")) then table.insert(remotes,{t=d.ClassName,o=d}) end
             end
-
-            table.insert(dumpResults, {
-                name       = script.Name,
-                class      = script.ClassName,
-                path       = path,
-                source     = source,
-                size       = size,
-                obfuscated = obfuscated,
-                disabled   = script:IsA("BaseScript") and not script.Enabled,
-            })
-            totalDumped = totalDumped + 1
-        end
-
-        if Config.ChunkYield and i % 5 == 0 then
-            SetStatus("Dumping " .. i .. " / " .. #allScripts, Theme.Warning)
-            task.wait(0.02)
         end
     end
 
-    -- Dump remotes
-    local remotes = GetRemotes()
-    SetStatus("Collecting remotes...", Theme.Warning)
-    task.wait(0.05)
+    SetStatus("Found " .. #scripts .. " scripts...", Theme.Warning)
+    task.wait(0.08)
 
-    -- Build summary
-    local summary = {}
-    table.insert(summary, "=== " .. TOOL_NAME .. " " .. VERSION .. " ===")
-    table.insert(summary, "Game: " .. game.Name)
-    table.insert(summary, "PlaceId: " .. tostring(game.PlaceId))
-    table.insert(summary, "Time: " .. os.date and os.date("%Y-%m-%d %H:%M:%S") or "N/A")
-    table.insert(summary, "")
-    table.insert(summary, "Scripts dumped: " .. totalDumped)
-    table.insert(summary, "Remotes found:  " .. #remotes)
-    table.insert(summary, "")
-
-    if Config.ScriptIndex then
-        table.insert(summary, "--- SCRIPT INDEX ---")
-        for i, r in ipairs(dumpResults) do
-            local flags = ""
-            if r.obfuscated then flags = flags .. " [OBFUSCATED]" end
-            if r.disabled   then flags = flags .. " [DISABLED]" end
-            table.insert(summary, string.format("[%d] %s (%s) - %d bytes%s", i, r.name, r.class, r.size, flags))
-            table.insert(summary, "    " .. r.path)
-        end
-        table.insert(summary, "")
+    local results = {}
+    for i, s in ipairs(scripts) do
+        local src = Decompile(s)
+        local obf = Config.DetectObfuscation and (src:find("\\%d%d%d") ~= nil)
+        table.insert(results, {name=s.Name, class=s.ClassName, path=GetPath(s), src=src, size=#src, obf=obf})
+        if Config.ChunkYield and i%5==0 then SetStatus("Dumping "..i.."/"..#scripts, Theme.Warning); task.wait(0.02) end
     end
 
-    if Config.HierarchyTree then
-        table.insert(summary, "--- HIERARCHY TREE ---")
-        local treeLines = BuildHierarchyTree(game)
-        for _, line in ipairs(treeLines) do
-            table.insert(summary, line)
-        end
-        table.insert(summary, "")
-    end
+    -- Build output
+    local out = {}
+    local function ln(s) table.insert(out, s or "") end
+
+    ln("=== "..TOOL_NAME.." "..VERSION.." ===")
+    ln("Game:    " .. game.Name)
+    ln("PlaceId: " .. tostring(game.PlaceId))
+    ln("JobId:   " .. tostring(game.JobId))
+    ln("")
 
     if Config.GameInfo then
-        table.insert(summary, "--- GAME INFO ---")
-        table.insert(summary, "Name:     " .. game.Name)
-        table.insert(summary, "PlaceId:  " .. tostring(game.PlaceId))
-        table.insert(summary, "JobId:    " .. game.JobId)
-        table.insert(summary, "Creator:  " .. tostring(game.CreatorId))
-        table.insert(summary, "")
+        ln("--- GAME INFO ---")
+        ln("Name:      " .. game.Name)
+        ln("PlaceId:   " .. tostring(game.PlaceId))
+        ln("CreatorId: " .. tostring(game.CreatorId))
+        ln("JobId:     " .. tostring(game.JobId))
+        ln("")
+    end
+
+    if Config.ScriptIndex then
+        ln("--- SCRIPT INDEX (" .. #results .. " scripts) ---")
+        for i, r in ipairs(results) do
+            ln(string.format("[%d] %s (%s) %d bytes%s", i, r.name, r.class, r.size, r.obf and " ⚠OBFUSCATED" or ""))
+            ln("    " .. r.path)
+        end
+        ln("")
     end
 
     if #remotes > 0 then
-        table.insert(summary, "--- REMOTES ---")
-        for _, r in ipairs(remotes) do
-            table.insert(summary, "[" .. r.type .. "] " .. GetFullPath(r.obj))
-        end
-        table.insert(summary, "")
+        ln("--- REMOTES (" .. #remotes .. ") ---")
+        for _, r in ipairs(remotes) do ln("[" .. r.t .. "] " .. GetPath(r.o)) end
+        ln("")
     end
 
     if Config.SizeBreakdown then
-        table.insert(summary, "--- SIZE BREAKDOWN ---")
-        local sorted = {}
-        for _, r in ipairs(dumpResults) do table.insert(sorted, r) end
-        table.sort(sorted, function(a, b) return a.size > b.size end)
-        for i = 1, math.min(10, #sorted) do
-            local r = sorted[i]
-            table.insert(summary, string.format("#%d  %-30s  %d bytes", i, r.name, r.size))
+        local sorted = {table.unpack(results)}
+        table.sort(sorted, function(a,b) return a.size > b.size end)
+        ln("--- SIZE BREAKDOWN (top 10) ---")
+        for i=1, math.min(10,#sorted) do
+            ln(string.format("#%-2d %-32s %d bytes", i, sorted[i].name, sorted[i].size))
         end
-        table.insert(summary, "")
+        ln("")
     end
 
-    -- Full dump
-    table.insert(summary, "")
-    table.insert(summary, "=== SCRIPT SOURCES ===")
-    for _, r in ipairs(dumpResults) do
-        table.insert(summary, "\n-- ==========================================")
-        table.insert(summary, "-- Name:  " .. r.name)
-        table.insert(summary, "-- Class: " .. r.class)
-        table.insert(summary, "-- Path:  " .. r.path)
-        table.insert(summary, "-- Size:  " .. r.size .. " bytes")
-        if r.obfuscated then
-            table.insert(summary, "-- ⚠ OBFUSCATED SCRIPT DETECTED")
-        end
-        table.insert(summary, "-- ==========================================")
-        table.insert(summary, r.source)
+    if Config.HierarchyTree then
+        ln("--- HIERARCHY TREE ---")
+        for _, l in ipairs(BuildTree(game)) do ln(l) end
+        ln("")
     end
 
-    -- JSON export
+    ln("=== SOURCES ===")
+    for _, r in ipairs(results) do
+        ln("")
+        ln("-- ══════════════════════════════════════")
+        ln("-- Script : " .. r.name)
+        ln("-- Class  : " .. r.class)
+        ln("-- Path   : " .. r.path)
+        ln("-- Size   : " .. r.size .. " bytes" .. (r.obf and "  ⚠ OBFUSCATED" or ""))
+        ln("-- ══════════════════════════════════════")
+        ln(r.src)
+    end
+
     if Config.JSONExport then
-        local jsonData = {
-            tool    = TOOL_NAME,
-            version = VERSION,
-            game    = {name = game.Name, placeId = game.PlaceId},
-            scripts = dumpResults,
-            remotes = {},
-        }
-        for _, r in ipairs(remotes) do
-            table.insert(jsonData.remotes, {type = r.type, path = GetFullPath(r.obj)})
-        end
-        local ok, jsonStr = pcall(HttpService.JSONEncode, HttpService, jsonData)
-        if ok then
-            table.insert(summary, "\n=== JSON EXPORT ===")
-            table.insert(summary, jsonStr)
-        end
+        local ok, js = pcall(HttpService.JSONEncode, HttpService, {
+            tool="NOVA DUMPER", version=VERSION,
+            game={name=game.Name, placeId=game.PlaceId},
+            scripts=results, remotes=remotes
+        })
+        if ok then ln(""); ln("=== JSON ==="); ln(js) end
     end
 
-    local finalStr = table.concat(summary, "\n")
+    local final = table.concat(out, "\n")
 
-    -- Copy to clipboard
-    if Config.AutoCopySummary then
-        pcall(setclipboard, finalStr)
-    end
-
-    -- Try to write to file
     local saved = false
     if writefile then
-        pcall(function()
-            writefile("NovaDumper_" .. tostring(game.PlaceId) .. ".txt", finalStr)
-            saved = true
-        end)
+        pcall(function() writefile("NovaDump_"..tostring(game.PlaceId)..".txt", final); saved = true end)
     end
-
-    -- Also try to put in clipboard if not done already
-    if not Config.AutoCopySummary then
-        pcall(setclipboard, finalStr)
-    end
+    pcall(setclipboard, final)
 
     isDumping = false
     DumpBtn.Text = "  ✓  DONE!"
-    DumpBtn.BackgroundColor3 = Theme.Success
-
-    local statusMsg = "Dumped " .. totalDumped .. " scripts, " .. #remotes .. " remotes"
-    if saved then statusMsg = statusMsg .. " • Saved to file" end
-    SetStatus(statusMsg, Theme.Success)
-
+    Tween(DumpBtn, {BackgroundColor3 = Theme.Success})
+    SetStatus("Done — "..#results.." scripts, "..#remotes.." remotes"..(saved and " · Saved" or " · Copied"), Theme.Success)
     task.wait(3)
     DumpBtn.Text = "  ▶  START DUMP"
-    DumpBtn.BackgroundColor3 = Theme.Accent
+    Tween(DumpBtn, {BackgroundColor3 = Theme.Accent})
     SetStatus("ready", Theme.Success)
 end
 
 DumpBtn.MouseButton1Click:Connect(function()
-    if not isDumping then
-        task.spawn(RunDump)
-    end
+    if not isDumping then task.spawn(RunDump) end
 end)
 
--- ══════════════════ DRAGGING ══════════════════
-local dragging, dragInput, dragStart, startPos
-
-Header.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-        dragStart = input.Position
-        startPos = MainFrame.Position
+-- ══════════════════ DRAG ══════════════════
+local drag, dragStart, startPos = false, nil, nil
+Header.InputBegan:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton1 then
+        drag=true; dragStart=i.Position; startPos=MainFrame.Position
     end
 end)
-
-Header.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = false
-    end
+Header.InputEnded:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton1 then drag=false end
 end)
-
-UserInputService.InputChanged:Connect(function(input)
-    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-        local delta = input.Position - dragStart
-        MainFrame.Position = UDim2.new(
-            startPos.X.Scale,
-            startPos.X.Offset + delta.X,
-            startPos.Y.Scale,
-            startPos.Y.Offset + delta.Y
-        )
+UserInputService.InputChanged:Connect(function(i)
+    if drag and i.UserInputType == Enum.UserInputType.MouseMovement then
+        local d = i.Position - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset+d.X, startPos.Y.Scale, startPos.Y.Offset+d.Y)
     end
 end)
 
 -- ══════════════════ OPEN ANIMATION ══════════════════
-MainFrame.Size = UDim2.new(0, 0, 0, 0)
-MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+MainFrame.Size = UDim2.new(0,1,0,1)
+MainFrame.Position = UDim2.new(0.5,0,0.5,0)
 TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-    Size = UDim2.new(0, 340, 0, 560),
-    Position = UDim2.new(0.5, -170, 0.5, -280),
+    Size = UDim2.new(0,340,0,560),
+    Position = UDim2.new(0.5,-170,0.5,-280),
 }):Play()
 
-print("[" .. TOOL_NAME .. "] " .. VERSION .. " loaded successfully!")
-print("Game: " .. game.Name .. " | PlaceId: " .. tostring(game.PlaceId))
+print("[NOVA DUMPER] v3.0 loaded | " .. game.Name .. " | " .. tostring(game.PlaceId))
